@@ -24,11 +24,6 @@ let plotConfig = {
     height: 20
 }
 
-// Change stream to update data
-col.watch().on('change', () => {
-    
-})
-
 // Interval to update data
 setInterval(() => {
     Object.entries(data).forEach(async ([status, arr]) => {
