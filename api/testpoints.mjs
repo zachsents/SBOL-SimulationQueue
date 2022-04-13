@@ -1,4 +1,6 @@
 import fs from 'fs/promises'
+import { pipeline } from 'stream/promises'
+import { ObjectId, GridFSBucket } from 'mongodb'
 import path from 'path'
 
 import db from './mongo.mjs'
@@ -101,4 +103,14 @@ app.post('/clearFiles', async (req, res) => {
     console.log('Done. Deleted', totalFiles, 'files.')
 
     res.json({ deleted: totalFiles })
+})
+
+
+app.get('/file/:fileId', async (req, res) => {
+    console.log('Getting file:', req.params.fileId)
+    
+    // download file and pipe to response
+    const bucket = new GridFSBucket(db)
+    const downloadStream = bucket.openDownloadStream(ObjectId(req.params.fileId))
+    await pipeline(downloadStream, res)
 })
