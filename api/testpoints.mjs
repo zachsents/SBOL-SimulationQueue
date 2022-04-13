@@ -114,3 +114,10 @@ app.get('/file/:fileId', async (req, res) => {
     const downloadStream = bucket.openDownloadStream(ObjectId(req.params.fileId))
     await pipeline(downloadStream, res)
 })
+
+app.get('/job/:jobId', async (req, res) => {
+    console.log('Getting job:', req.params.jobId)
+
+    // find job and send response
+    res.json(await jobsCollection.findOne(ObjectId(req.params.jobId)))
+})
