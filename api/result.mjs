@@ -7,7 +7,7 @@ import Status from './status.mjs'
 
 const jobsCollection = db.collection(process.env.JOB_COLLECTION)
 
-async function zip(req, res) {
+export async function zip(req, res) {
     
     // find document in database
     const { jobId } = req.params
@@ -23,9 +23,4 @@ async function zip(req, res) {
     const bucket = new GridFSBucket(db)
     const downloadStream = bucket.openDownloadStream(document.result)
     await pipeline(downloadStream, res)
-}
-
-
-export default {
-    zip
 }
