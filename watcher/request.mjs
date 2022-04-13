@@ -1,6 +1,6 @@
 import path from 'path'
-import FormData from 'form-data'
 import fetch from 'node-fetch'
+import { FormData, Blob } from 'formdata-node'
 
 
 export async function convert(options, filename, fileBuffer) {
@@ -23,8 +23,8 @@ export async function request(endpoint, options, filename, fileBuffer) {
 
     // prepare form body
     let formData = new FormData()
-    formData.append('file', fileBuffer, { filename })
-
+    formData.append('file', new Blob([ fileBuffer ]), filename)
+    
     // make the request
     let response
     try {

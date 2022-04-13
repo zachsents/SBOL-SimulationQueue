@@ -1,6 +1,7 @@
-import fs from 'fs/promises'
-import path from 'path'
-import { v4 as uuidv4 } from 'uuid'
+import { ReadableStreamBuffer } from 'stream-buffers'
+import { GridFSBucket } from 'mongodb'
+import { pipeline } from 'stream/promises'
+
 import db from './mongo.mjs'
 import Status from './status.mjs'
 
@@ -26,22 +27,15 @@ function jobParsingAndValidation(req, res, next) {
         data: fileBuffer
     } = Object.values(req.files)[0]
 
-    // generate unique file name
-    let bucketFileName = `${uuidv4()}.xml`
-
     // expose parameters we'll need for database insertion
     req.document = {
         user,
         options,
-        originalFileName: fileName,
-        bucketFileName,
-
-        // default value(s)
         status: Status.WAITING
     }
 
-    // expose file buffer
-    req.fileBuffer = fileBuffer
+    // expose file name and buffer
+    req.sbolFile = { fileName, fileBuffer }
 
     next()
 }
@@ -50,13 +44,24 @@ function jobParsingAndValidation(req, res, next) {
 /*
 *   Upload file and insert document into database
 */
-async function submitJob({ document, fileBuffer }, res) {
+async function submitJob({ document, sbolFile }, res) {
 
-    // write to storage volume
-    let filePath = path.join(process.cwd(), process.env.JOB_STORAGE_FOLDER, document.bucketFileName)
-    await fs.writeFile(filePath, fileBuffer)
+    // Create stream from file
+    const fileStream = new ReadableStreamBuffer()
+    fileStream.put(sbolFile.fileBuffer)
+    fileStream.stop()
 
-    console.log('Uploaded file:', filePath)
+    // Create upload stream for GridFS
+    const bucket = new GridFSBucket(db)
+    const uploadStream = bucket.openUploadStream(sbolFile.fileName, {
+        // TO DO: add metadata associating file with job
+        // For now, just the job has the file's ID
+        // metadata: { field: 'xx', value: 'xx' }
+    })
+    await pipeline(fileStream, uploadStream)
+    document.sbolFile = uploadStream.id
+    
+    console.log('Uploaded file:', uploadStream.id.toHexString())
 
     // create document with data
     let { insertedId } = await db.collection(process.env.JOB_COLLECTION).insertOne(document)

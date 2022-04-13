@@ -1,17 +1,16 @@
-import fs from 'fs/promises'
-import path from 'path'
 import { from, fromEventPattern, mergeMap, filter } from 'rxjs'
 import { GridFSBucket } from 'mongodb'
-import mongoUUID from 'uuid-mongodb'
 import { pipeline } from 'stream/promises'
 
 
 import db from './mongo.mjs'
 import Status from './status.mjs'
 import { request as ibiosimRequest } from './request.mjs'
+import { WritableStreamBuffer } from 'stream-buffers'
 
 
 const jobsCollection = db.collection(process.env.JOB_COLLECTION)
+const bucket = new GridFSBucket(db)
 
 // Create observable
 const documents = fromEventPattern(handler => {
@@ -25,7 +24,7 @@ documents
         mergeMap(event => from(runJob(event)), process.env.MAX_CONCURRENT_JOBS)
     )
     .subscribe(
-        results => console.log('Done. Stored results in:\n', results)
+        result => console.log('Done. Stored results in:\n', result.toHexString())
     )
 
 
@@ -42,17 +41,22 @@ async function runJob({ fullDocument }) {
         $currentDate: { executionTime: true }
     })
 
-    // read in associated file
-    let filePath = path.join(process.cwd(), process.env.JOB_STORAGE_FOLDER, fullDocument.bucketFileName)
-    let fileBuffer = await fs.readFile(filePath)
+    // download SBOL file to buffer
+    const downloadStream = bucket.openDownloadStream(fullDocument.sbolFile)
+    const streamBuffer = new WritableStreamBuffer()
+    await pipeline(downloadStream, streamBuffer)
 
     // run job
-    const response = await ibiosimRequest(fullDocument.type, fullDocument.options, fullDocument.originalFileName, fileBuffer)
+    const response = await ibiosimRequest(
+        fullDocument.type,
+        fullDocument.options,
+        'sbol.xml',
+        streamBuffer.getContents()
+    )
 
     // store result in GridFS
     // TO DO: unzip file and store all components individually
-    const bucket = new GridFSBucket(db)
-    const uploadStream = bucket.openUploadStream(`${mongoUUID.v4().toString()}.zip`, {
+    const uploadStream = bucket.openUploadStream('result.zip', {
         metadata: { field: 'job', value: fullDocument._id }
     })
     await pipeline(response.body, uploadStream)

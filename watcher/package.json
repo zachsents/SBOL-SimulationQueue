@@ -9,10 +9,11 @@
   },
   "dependencies": {
     "asciichart": "^1.5.25",
-    "form-data": "^4.0.0",
+    "formdata-node": "^4.3.2",
     "mongodb": "^4.3.1",
     "node-fetch": "^3.2.0",
     "rxjs": "^7.5.5",
+    "stream-buffers": "^3.0.2",
     "uuid-mongodb": "^2.5.1"
   },
   "author": "",
