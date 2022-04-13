@@ -1,8 +1,6 @@
 import path from 'path'
 import FormData from 'form-data'
 import fetch from 'node-fetch'
-import { pipeline } from 'stream/promises'
-import fs from 'fs/promises'
 
 
 export async function convert(options, filename, fileBuffer) {

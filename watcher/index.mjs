@@ -8,7 +8,7 @@ import { pipeline } from 'stream/promises'
 
 import db from './mongo.mjs'
 import Status from './status.mjs'
-import { request } from './request.mjs'
+import { request as ibiosimRequest } from './request.mjs'
 
 
 const jobsCollection = db.collection(process.env.JOB_COLLECTION)
@@ -35,7 +35,7 @@ documents
 async function runJob({ fullDocument }) {
 
     // update status of document
-    jobsCollection.updateOne({
+    await jobsCollection.updateOne({
         _id: fullDocument._id
     }, {
         $set: { status: Status.ACTIVE },
@@ -47,9 +47,10 @@ async function runJob({ fullDocument }) {
     let fileBuffer = await fs.readFile(filePath)
 
     // run job
-    const response = await request(fullDocument.type, fullDocument.options, fullDocument.originalFileName, fileBuffer)
+    const response = await ibiosimRequest(fullDocument.type, fullDocument.options, fullDocument.originalFileName, fileBuffer)
 
     // store result in GridFS
+    // TO DO: unzip file and store all components individually
     const bucket = new GridFSBucket(db)
     const uploadStream = bucket.openUploadStream(`${mongoUUID.v4().toString()}.zip`, {
         metadata: { field: 'job', value: fullDocument._id }
@@ -57,12 +58,12 @@ async function runJob({ fullDocument }) {
     await pipeline(response.body, uploadStream)
 
     // update document with status and results
-    jobsCollection.updateOne({
+    await jobsCollection.updateOne({
         _id: fullDocument._id
     }, {
         $set: {
             status: Status.COMPLETE,
-            results: uploadStream.id
+            result: uploadStream.id
         },
         $currentDate: { completionTime: true }
     })

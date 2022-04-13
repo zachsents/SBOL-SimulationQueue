@@ -1,12 +1,12 @@
 import fs from 'fs/promises'
 import path from 'path'
-
 import express from 'express'
 import fileUpload from 'express-fileupload'
 import {v4 as uuidv4} from 'uuid'
 
 import db from './mongo.mjs'
 import Status from './status.mjs'
+import result from './result.mjs'
 
 
 // Set up express, globalize app variable
@@ -138,6 +138,9 @@ app.post(
     setType('convert_and_simulate'),
     submitJob
 )
+
+// Results endpoints
+app.get('/result/:jobId/zip', result.zip)
 
 
 // Include testing endpoints
