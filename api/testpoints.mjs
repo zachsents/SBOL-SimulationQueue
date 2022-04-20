@@ -10,6 +10,7 @@ import db from './mongo.mjs'
 */
 const jobsCollection = db.collection(process.env.JOB_COLLECTION)
 const jobStorage = process.env.JOB_STORAGE_FOLDER
+const bucket = new GridFSBucket(db)
 
 // List all files saved in job storage
 // process.NODE_ENV == 'development' &&
@@ -41,21 +42,21 @@ app.get('/listJobs', async (req, res) => {
 
     // if readFiles parameter is set, return file data as well
     req.query.readFiles &&
-    (jobs = await Promise.all(jobs.map(async job => {
-        let fileBuffer
-        
-        try {
-            // if file exists, read the buffer
-            fileBuffer = Buffer.from(await fs.readFile(
-                path.join(process.cwd(), jobStorage, job.bucketFileName)
-            )).toString()
-        } catch(err) {
-            // otherwise, return nothing
-            fileBuffer = ''
-        }
+        (jobs = await Promise.all(jobs.map(async job => {
+            let fileBuffer
 
-        return { ...job, fileBuffer }
-    })))
+            try {
+                // if file exists, read the buffer
+                fileBuffer = Buffer.from(await fs.readFile(
+                    path.join(process.cwd(), jobStorage, job.bucketFileName)
+                )).toString()
+            } catch (err) {
+                // otherwise, return nothing
+                fileBuffer = ''
+            }
+
+            return { ...job, fileBuffer }
+        })))
 
     res.json({
         found: jobs.length,
@@ -69,14 +70,14 @@ app.post('/clearJobs', async (req, res) => {
 
     let batchSize = parseInt(req.query.batchSize) || 100
     let totalJobs = await jobsCollection.countDocuments()
-    
+
     console.log(`Clearing collection "${jobsCollection.collectionName}" in batches of`, batchSize)
 
     // Loop through jobs in batches
-    while(await jobsCollection.countDocuments() > 0) {
+    while (await jobsCollection.countDocuments() > 0) {
         let jobs = await jobsCollection.find().limit(batchSize).toArray()
         await jobsCollection.deleteMany(
-            {_id: { $in: jobs.map(job => job._id)}}
+            { _id: { $in: jobs.map(job => job._id) } }
         )
         console.log('Deleted a batch of', jobs.length, 'jobs.')
     }
@@ -94,7 +95,7 @@ app.post('/clearFiles', async (req, res) => {
 
     let files = (await fs.readdir(
         path.join(process.cwd(), jobStorage)
-    )).map(fileName => 
+    )).map(fileName =>
         path.join(process.cwd(), jobStorage, fileName)
     )
     let totalFiles = files.length
@@ -108,11 +109,24 @@ app.post('/clearFiles', async (req, res) => {
 
 app.get('/file/:fileId', async (req, res) => {
     console.log('Getting file:', req.params.fileId)
-    
+
+    try {
+        // download file and pipe to response
+        const downloadStream = bucket.openDownloadStream(ObjectId(req.params.fileId))
+        await pipeline(downloadStream, res)
+    }
+    catch (err) {
+        res.json({ error: "Couldn't retrieve file." })
+    }
+})
+
+app.post('/file/:fileName', async (req, res) => {
+    console.log('Posting file:', req.params.fileName)
+
     // download file and pipe to response
-    const bucket = new GridFSBucket(db)
-    const downloadStream = bucket.openDownloadStream(ObjectId(req.params.fileId))
-    await pipeline(downloadStream, res)
+    const uploadStream = bucket.openUploadStream(req.params.fileName)
+    await pipeline(req, uploadStream)
+    res.json({ fileId: uploadStream.id })
 })
 
 app.get('/job/:jobId', async (req, res) => {
