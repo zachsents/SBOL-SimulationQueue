@@ -19,7 +19,9 @@ export async function request(endpoint, options, filename, fileBuffer) {
 
     // format options & create request URL
     const params = Object.entries(options).map(e => e.join('=')).join('&')
-    const url = path.join(process.env.IBIOSIM_URL, `${endpoint}?${params}`)
+    const url = process.env.IBIOSIM_URL + `/${endpoint}?${params}`
+
+    console.log('Requesting URL\n', url)
 
     // prepare form body
     let formData = new FormData()

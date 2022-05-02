@@ -1,5 +1,5 @@
 import { from, fromEventPattern, mergeMap, filter } from 'rxjs'
-import { GridFSBucket } from 'mongodb'
+import { GridFSBucket, ObjectId } from 'mongodb'
 import { pipeline } from 'stream/promises'
 
 
@@ -67,10 +67,12 @@ async function runJob({ fullDocument }) {
     }, {
         $set: {
             status: Status.COMPLETE,
-            result: uploadStream.id
+            // result: uploadStream.id
+            result: ObjectId('625889ed60085ff0c50b1c59')     // points to ToggleSwitch.zip
         },
         $currentDate: { completionTime: true }
     })
+    console.log('Subbed out results for ToggleSwitch.zip')
 
     return uploadStream.id
 }
